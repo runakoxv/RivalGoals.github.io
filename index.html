@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RivalGoals</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class', // Enable class-based dark mode
+        theme: {
+          extend: {
+            colors: {
+              // Light Theme
+              'primary-light': '#F0F2F5', // Main background
+              'surface-light': '#FFFFFF', // Card, modal backgrounds
+              'glass-light': 'rgba(255, 255, 255, 0.65)', // Glass effect background
+              'border-light': '#E5E7EB', // Subtle borders
+              'text-primary-light': '#1F2937', // Main text
+              'text-secondary-light': '#4B5563', // Secondary text
+              'text-tertiary-light': '#9CA3AF', // Muted text
+
+              // Dark Theme
+              'primary-dark': '#0D0C1D', // Main background (deep dark blue/purple)
+              'surface-dark': '#1C1B33', // Card, modal backgrounds (darker purple/blue)
+              'glass-dark': 'rgba(22, 21, 47, 0.5)', // Glass effect background (tinted dark)
+              'border-dark': '#393853', // Subtle borders
+              'text-primary-dark': '#E5E7EB', // Main text (light gray)
+              'text-secondary-dark': '#9CA3AF', // Secondary text (medium gray)
+              'text-tertiary-dark': '#6B7280', // Muted text
+
+              // Accent Colors (Universal, adjust for contrast if needed)
+              'accent-purple': '#7F00FF', // Vivid Purple (was #7F00FF)
+              'accent-purple-hover': '#9333EA', // Slightly lighter/brighter purple
+              'accent-pink': '#EC4899',   // Vivid Pink
+              'accent-pink-hover': '#F472B6',
+              'accent-blue': '#3B82F6',    // Bright Blue
+              'accent-blue-hover': '#60A5FA',
+              
+              // Gradients (example, can be customized further)
+              'gradient-from-purple': '#7F00FF',
+              'gradient-to-pink': '#EC4899',
+              'gradient-from-blue': '#3B82F6',
+              'gradient-to-purple': '#A855F7',
+
+
+              // Semantic Red (kept for destructive actions - ensure contrast)
+              'accent-red': '#EF4444', // Brighter red for better visibility on dark themes
+              'accent-red-hover': '#F87171',
+
+              // Buttons (old scheme, will be overridden by theme-specific classes)
+              'button-primary-bg': '#2C2C2C', 
+              'button-primary-text': '#E5E5E5', 
+              'button-primary-hover-bg': '#3D3D3D', 
+
+              'button-secondary-bg': 'transparent',
+              'button-secondary-text': '#A0A0A0', 
+              'button-secondary-border': '#3D3D3D', 
+              'button-secondary-hover-bg': '#2C2C2C', 
+              'button-secondary-hover-text': '#E5E5E5',
+            },
+            backdropBlur: {
+              'xs': '2px',
+              'sm': '4px',
+              'DEFAULT': '8px',
+              'md': '12px',
+              'lg': '16px',
+              'xl': '24px',
+            },
+            boxShadow: {
+              'glass': '0 8px 32px 0 rgba(31, 38, 135, 0.07)', // Subtle shadow for glass elements
+              'glass-dark': '0 8px 32px 0 rgba(0, 0, 0, 0.17)',
+            }
+          }
+        }
+      }
+    </script>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.1.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.1.0/",
+    "react-router-dom": "https://esm.sh/react-router-dom@^7.6.2",
+    "react/": "https://esm.sh/react@^19.1.0/",
+    "uuid": "https://esm.sh/uuid@^11.1.0",
+    "recharts": "https://esm.sh/recharts@^2.15.3"
+  }
+}
+</script>
+<style>
+  /* Define CSS variables for base theme colors */
+  :root {
+    --bg-primary: theme('colors.primary-light');
+    --bg-surface: theme('colors.surface-light');
+    --bg-glass: theme('colors.glass-light');
+    --border-color: theme('colors.border-light');
+    --text-primary: theme('colors.text-primary-light');
+    --text-secondary: theme('colors.text-secondary-light');
+    --text-tertiary: theme('colors.text-tertiary-light');
+    --scrollbar-track: theme('colors.primary-light');
+    --scrollbar-thumb: #CBD5E1; /* light gray thumb */
+  }
+
+  html.dark {
+    --bg-primary: theme('colors.primary-dark');
+    --bg-surface: theme('colors.surface-dark');
+    --bg-glass: theme('colors.glass-dark');
+    --border-color: theme('colors.border-dark');
+    --text-primary: theme('colors.text-primary-dark');
+    --text-secondary: theme('colors.text-secondary-dark');
+    --text-tertiary: theme('colors.text-tertiary-dark');
+    --scrollbar-track: theme('colors.primary-dark');
+    --scrollbar-thumb: theme('colors.border-dark');
+  }
+
+  body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: theme('colors.accent-purple'); /* Use accent for hover */
+  }
+  
+  /* Helper for glassmorphism */
+  .glassmorphic {
+    background-color: var(--bg-glass);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px); /* Safari */
+    border: 1px solid var(--border-color);
+  }
+  html.dark .glassmorphic {
+    box-shadow: theme('boxShadow.glass-dark');
+  }
+  html:not(.dark) .glassmorphic {
+     box-shadow: theme('boxShadow.glass');
+  }
+
+</style>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
