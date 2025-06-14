@@ -59,41 +59,64 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
     case AppActionType.INITIALIZE_STATE: {
       const storedState = localStorage.getItem(LOCAL_STORAGE_KEY);
       let parsedInitialState: AppState;
+      
+      const systemPrefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      
       if (storedState) {
-        let parsed = JSON.parse(storedState) as any; 
+        try {
+          let parsed: any = JSON.parse(storedState); // Keep as 'any' for initial flexibility
 
-        if (parsed.scrapPaperContent && (!parsed.savedNotes || parsed.savedNotes.length === 0)) {
-          const now = new Date().toISOString();
-          const migratedNote: ScrapNote = {
-            id: uuidv4(),
-            title: "My First Note (Migrated)",
-            content: parsed.scrapPaperContent,
-            createdAt: now,
-            updatedAt: now,
+          // Handle migrations and default initializations for fields within 'parsed' object itself
+          if (parsed.scrapPaperContent && (!parsed.savedNotes || parsed.savedNotes.length === 0)) {
+            const now = new Date().toISOString();
+            const migratedNote: ScrapNote = {
+              id: uuidv4(),
+              title: "My First Note (Migrated)",
+              content: parsed.scrapPaperContent,
+              createdAt: now,
+              updatedAt: now,
+            };
+            parsed.savedNotes = [migratedNote];
+          }
+          delete parsed.scrapPaperContent; 
+
+          parsed.userSettings = { ...DEFAULT_USER_SETTINGS, ...parsed.userSettings };
+          parsed.lastRivaActivityMessage = parsed.lastRivaActivityMessage || null;
+          parsed.savedNotes = Array.isArray(parsed.savedNotes) ? parsed.savedNotes : [];
+          parsed.onboardingCompleted = typeof parsed.onboardingCompleted === 'boolean' ? parsed.onboardingCompleted : false;
+          parsed.focusAddTaskTrigger = typeof parsed.focusAddTaskTrigger === 'number' ? parsed.focusAddTaskTrigger : 0;
+          
+          // Determine theme value safely
+          const themeValue: Theme = (parsed.theme === 'light' || parsed.theme === 'dark') ? parsed.theme : (systemPrefersDark ? 'dark' : 'light');
+          
+          parsedInitialState = { 
+              ...INITIAL_APP_STATE, 
+              ...parsed, // Spread modified 'parsed' object
+              theme: themeValue, // Explicitly set the theme property with the correct type
+              initialized: true 
           };
-          parsed.savedNotes = [migratedNote];
+
+        } catch (error) {
+          console.error("Failed to parse state from localStorage, using default state:", error);
+          parsedInitialState = { ...INITIAL_APP_STATE, theme: systemPrefersDark ? 'dark' : 'light', initialized: true };
+          // Optionally, clear the corrupted local storage
+          // localStorage.removeItem(LOCAL_STORAGE_KEY);
         }
-        delete parsed.scrapPaperContent; 
-
-        parsed.userSettings = { ...DEFAULT_USER_SETTINGS, ...parsed.userSettings };
-        parsed.lastRivaActivityMessage = parsed.lastRivaActivityMessage || null;
-        parsed.savedNotes = Array.isArray(parsed.savedNotes) ? parsed.savedNotes : [];
-        parsed.onboardingCompleted = typeof parsed.onboardingCompleted === 'boolean' ? parsed.onboardingCompleted : false;
-        parsed.focusAddTaskTrigger = typeof parsed.focusAddTaskTrigger === 'number' ? parsed.focusAddTaskTrigger : 0;
-        parsed.theme = parsed.theme === 'light' || parsed.theme === 'dark' ? parsed.theme : INITIAL_APP_STATE.theme; // Load theme
-        
-        parsedInitialState = { ...INITIAL_APP_STATE, ...parsed, initialized: true };
-
       } else {
-        // Attempt to get system preference for theme on first load
-        const systemPrefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
         parsedInitialState = { ...INITIAL_APP_STATE, theme: systemPrefersDark ? 'dark' : 'light', initialized: true };
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(parsedInitialState));
+        // Do not save to localStorage here, let subsequent actions do it if needed
+        // This prevents writing INITIAL_APP_STATE immediately if it's the very first load
       }
       
       const today = new Date().toISOString().split('T')[0];
       if (parsedInitialState.lastLoginDate !== today && parsedInitialState.onboardingCompleted) { 
+        // Important: Pass the successfully parsed or default state to HANDLE_NEW_DAY
         return appReducer(parsedInitialState, { type: AppActionType.HANDLE_NEW_DAY });
+      }
+      // If we are here, either it's not a new day, or onboarding is not complete, or state was just initialized.
+      // We should persist the initialized state if it was loaded from localStorage or is a fresh default.
+      if (!storedState) { // Only save if it was a truly fresh start (no stored state)
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(parsedInitialState));
       }
       return parsedInitialState; 
     }
@@ -122,7 +145,7 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
       const newStreak = (state.currentUserXP > 0 || yesterdayStat.tasksCompleted > 0) ? state.currentStreak + 1 : 0;
 
       newState = {
-        ...state,
+        ...state, // carry over the already initialized state
         dailyHistory: newDailyHistory,
         currentUserXP: 0,
         currentRivaXP: 0, 
@@ -132,7 +155,7 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
         lastRivaActivityMessage: "Riva is strategizing for the day ahead...", 
       };
       newState.currentTitle = determineHighestTitle(newState);
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newState)); 
+      // localStorage is saved at the end of the reducer function
       return newState;
     }
     case AppActionType.TOGGLE_THEME:
@@ -245,12 +268,17 @@ const appReducer = (state: AppState, action: AppAction): AppState => {
       newState = { ...state, focusAddTaskTrigger: state.focusAddTaskTrigger + 1 };
       break;
     default:
+      // Should not happen, but as a fallback, return current state
+      // const exhaustiveCheck: never = action; // This would cause a type error if a case is missed
+      // console.warn("Unhandled action type:", action);
       newState = state; 
   }
   
-  // Save all relevant state, including theme
-  const stateToSave = { ...newState };
-  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(stateToSave));
+  // Save state to localStorage for all actions except INITIALIZE_STATE,
+  // as INITIALIZE_STATE handles its own specific localStorage logic (e.g., only saving on a truly fresh start).
+  if (action.type !== AppActionType.INITIALIZE_STATE) {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newState));
+  }
   return newState;
 };
 
@@ -258,8 +286,9 @@ export const AppProvider: React.FC<{children: ReactNode}> = ({ children }) => {
   const [state, dispatch] = useReducer(appReducer, INITIAL_APP_STATE);
 
   useEffect(() => {
+    // Dispatch INITIALIZE_STATE only once on mount
     dispatch({ type: AppActionType.INITIALIZE_STATE });
-  }, []); 
+  }, []); // Empty dependency array ensures this runs only once
 
   return (
     <AppContext.Provider value={{ state, dispatch }}>
